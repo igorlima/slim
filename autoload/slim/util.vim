@@ -58,7 +58,7 @@ function! slim#util#updateConfig(env, data)
         endif
     endfor
     " XXX
-    echo 'updateConfig'
+    " echo 'updateConfig'
     call writefile(l:new_list, l:file_name)
 endfunction
 

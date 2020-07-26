@@ -44,7 +44,7 @@ function! s:openChannelList(workspace)
         \ . a:workspace
         \ .'/channel.slimc')
     " XXX
-    echo 'openChannelList'
+    " echo 'openChannelList'
     nnoremap <buffer> <CR> 0wvt[h"zy:call slim#app#changeChannel(@z)<CR>
 endfunction
 
@@ -96,13 +96,13 @@ endfunction
 
 function! slim#app#changeChannel(channel)
     " XXX
-    echo 'changeChannel 1'
+    " echo 'changeChannel 1'
     if g:current_workspace_channel ==# a:channel
         return
     endif
 
     " XXX
-    echo 'changeChannel 2'
+    " echo 'changeChannel 2'
     call slim#util#updateConfig('',{'g:current_workspace_channel': a:channel})
     tabclose
     call slim#StartSlack()
@@ -137,7 +137,7 @@ endfunction
 " XXX a new function to check out for unread channel
 " • command! SlackUnreadChannel :call slim#app#checkForUnreadChannel()
 function! slim#app#checkForUnreadChannel()
-    echom "FETCHING unread messages..."
+    " echom "FETCHING unread channels..."
     let l:url = 'https://slack.com/api/client.counts'
 
     let g:id_map['slim_count'] = {}
@@ -186,11 +186,76 @@ function! slim#app#checkForUnreadChannel()
     endwhile
 
     call writefile(l:channel_list, l:channel_file_name)
-    echom "FETCHED unread messages..."
+    " echom "FETCHED unread channels..."
 endfunction
 
+" XXX a new function to check out for all unread messages
+" • command! SlackUnreadMessages :call slim#app#checkForUnreadMessages()
+function! slim#app#checkForUnreadMessages()
+    " echom "FETCHING unread messages..."
+    let l:url = 'https://slack.com/api/unread.history'
+
+    let l:request = {
+        \ 'method': 'POST',
+        \ 'uri': l:url,
+        \ 'params': {
+        \   "token": get(g:id_map.slim_workspace,g:current_workspace),
+        \   "timestamp": 0,
+        \   "sort": 'newest',
+        \   }
+        \ }
+    let l:curl = slim#util#getCurlCommand(l:request)
+    let l:response = system(l:curl)
+    let l:decoded = json_decode(l:response)
+    let l:lines = []
+    let l:channels = l:decoded['channels']
+
+    let l:workspace_dir = g:data_path . '/workspaces/' . g:current_workspace
+    let l:channel_file_name = l:workspace_dir . '/all_unreads.slimv'
+    if !filereadable(l:channel_file_name)
+        call writefile([], l:channel_file_name)
+    endif
+
+    let l:lines = []
+    for l:channel in l:channels
+      let l:count = l:channel['messages_count']
+      let l:unreads = l:channel['total_unreads']
+      let l:channel_name = get(g:id_map.slack_channel, l:channel.channel_id, 'Channel')
+      let l:messages_lines = []
+
+      call add(l:lines, l:channel_name)
+      call add(l:lines, '=======')
+      call add(l:lines, '')
+
+      let l:messages = l:channel['messages']
+      for l:message in l:messages
+        let l:user_id = ''
+
+        if has_key(l:message, 'user')
+          let l:user_id = l:message.user
+        elseif has_key(l:message, 'username')
+          let l:user_id = l:message.username
+        else
+          let l:user_id = 'NONE'
+        endif
+
+        let l:text = map(split(l:message.text, '\n'), '"  ".v:val')
+        let l:time = strftime("d-%Ya%mm%dd %I:%M %p", l:message.ts)
+        call add(l:messages_lines, l:user_id . ' ' . l:time)
+        call add(l:messages_lines, '-------')
+        call extend(l:messages_lines, l:text)
+        call add(l:messages_lines, '')
+      endfor
+      call extend(l:lines, l:messages_lines)
+      call add(l:lines, '')
+    endfor
+
+    call writefile(l:lines, l:channel_file_name)
+    execute 'e ' . l:channel_file_name
+    " echom "FETCHED unread messages..."
+endfunction
 function! slim#app#requestChannelHistory(channel_name)
-    echom "REQUESTING HISTORY"
+    " echom "REQUESTING HISTORY"
     let l:url = 'https://slack.com/api/conversations.history'
 
     let l:request = {
@@ -212,7 +277,7 @@ function! slim#app#requestChannelHistory(channel_name)
         let l:text = map(split(l:message.text, '\n'), '"  ".v:val')
 
         " let l:text = ' ' .substitute(l:message.text, '\^@', '\n', 'g')
-        let l:time = strftime("%I:%M %p", l:message.ts)
+        let l:time = strftime("d-%Ya%mm%dd %I:%M %p", l:message.ts)
 
         call add(l:lines, l:user_name . ' ' . l:time . ' [='.l:user_id.'=]')
         call add(l:lines, '-------')

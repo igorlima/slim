@@ -118,7 +118,7 @@ function! s:requestWorkspaceMembers(env, workspace_token, workspace_name)
         \ 'uri': l:uri,
         \ 'params': {
         \   "token": a:workspace_token,
-        \   "limit": 100
+        \   "limit": 1
         \   }
         \ }
     let l:curl = slim#util#getCurlCommand(l:request)
