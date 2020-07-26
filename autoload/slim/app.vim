@@ -45,6 +45,8 @@ function! s:openChannelList(workspace)
         \ .'/channel.slimc')
     " XXX
     " echo 'openChannelList'
+    nnoremap <buffer> slm 0wvt[h"zy:call slim#app#markChannelAsRead(@z)<CR>
+    nnoremap <buffer> slu :call slim#app#checkForUnreadChannel()<CR>
     nnoremap <buffer> <CR> 0wvt[h"zy:call slim#app#changeChannel(@z)<CR>
 endfunction
 
@@ -58,6 +60,7 @@ function! s:openChannel(workspace, channel)
     execute 'w'
     " call TailStart()
     " command! -nargs=0 TailStart call tail#start_tail()
+    nnoremap <buffer> slu :call slim#app#checkForUnreadMessages()<CR>
 endfunction
 
 function! s:openWorkspaceList()
@@ -186,6 +189,7 @@ function! slim#app#checkForUnreadChannel()
     endwhile
 
     call writefile(l:channel_list, l:channel_file_name)
+    execute 'e ' . l:channel_file_name
     " echom "FETCHED unread channels..."
 endfunction
 
@@ -254,6 +258,43 @@ function! slim#app#checkForUnreadMessages()
     execute 'e ' . l:channel_file_name
     " echom "FETCHED unread messages..."
 endfunction
+
+function! slim#app#markChannelAsRead(channel)
+    " XXX
+    let l:channel_id = ''
+    if has_key(g:id_map['slim_channel'], a:channel)
+      let l:channel_id = g:id_map['slim_channel'][a:channel]
+    endif
+    if empty(l:channel_id)
+      return
+    endif
+
+    let l:channel = {}
+    if has_key(g:id_map, 'slim_count') && has_key(g:id_map['slim_count'], l:channel_id)
+      let l:channel = g:id_map['slim_count'][l:channel_id]
+    endif
+    if empty(l:channel)
+      echom "check for unread channels first, by typing `slu`"
+      return
+    endif
+
+    let l:url = 'https://slack.com/api/conversations.mark'
+    let l:request = {
+        \ 'method': 'POST',
+        \ 'uri': l:url,
+        \ 'params': {
+        \   "token": get(g:id_map.slim_workspace,g:current_workspace),
+        \   "channel": l:channel_id,
+        \   "ts": l:channel.latest,
+        \   }
+        \ }
+    let l:curl = slim#util#getCurlCommand(l:request)
+    let l:response = system(l:curl)
+    let l:decoded = json_decode(l:response)
+    echom 'marked as read: ' . a:channel
+    " echom "l:decoded"
+endfunction
+
 function! slim#app#requestChannelHistory(channel_name)
     " echom "REQUESTING HISTORY"
     let l:url = 'https://slack.com/api/conversations.history'
