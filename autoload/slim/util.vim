@@ -16,6 +16,7 @@ function! slim#util#getCurlCommand(request)
                 \ . '&'
         endfor
     else
+        " XXX https://github.com/Colmbus72/slim/issues/2
         for [l:param_key, l:param_value] in items(a:request.params)
             let l:data = l:data 
                 \ . " -d "
@@ -56,6 +57,8 @@ function! slim#util#updateConfig(env, data)
             call add(l:new_list, l:line)
         endif
     endfor
+    " XXX
+    echo 'updateConfig'
     call writefile(l:new_list, l:file_name)
 endfunction
 
@@ -99,7 +102,8 @@ function! slim#util#loadIdMap()
     let l:channel_list = readfile(l:channel_file_name)
     for l:line in l:channel_list
         let l:key = matchstr(l:line, '\[=\zs.*\ze=\]')
-        let l:name = matchstr(l:line, '[\#\|🔒\|\@]\s\zs.*\ze\s')
+        " XXX changing regex to support unread notification
+        let l:name = matchstr(l:line, '[\#\|🔒\|\@]\s\zs.*\ze\s\[=')
         if !empty(l:key) || !empty(l:name)
             let g:id_map['slack_channel'][l:key] = l:name
             let g:id_map['slim_channel'][l:name] = l:key

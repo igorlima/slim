@@ -112,11 +112,13 @@ endfunction
 function! s:requestWorkspaceMembers(env, workspace_token, workspace_name)
     let l:uri = "https://slack.com/api/users.list"
 
+    " TODO
     let l:request = {
         \ 'method': 'GET',
         \ 'uri': l:uri,
         \ 'params': {
-        \   "token": a:workspace_token
+        \   "token": a:workspace_token,
+        \   "limit": 100
         \   }
         \ }
     let l:curl = slim#util#getCurlCommand(l:request)
@@ -154,12 +156,14 @@ endfunction
 function! s:requestConversations(env, workspace_token)
     let l:uri = "https://slack.com/api/conversations.list"
 
+    " TODO
     let l:request = {
         \ 'method': 'GET',
         \ 'uri': l:uri,
         \ 'params': {
         \   "token": a:workspace_token,
-        \   "types": "public_channel,private_channel,mpim,im"
+        \   "types": "public_channel,private_channel,mpim,im",
+        \   "limit": 200
         \   }
         \ }
     let l:curl = slim#util#getCurlCommand(l:request)
@@ -211,6 +215,7 @@ function! s:requestConversations(env, workspace_token)
         \ . '/workspaces/'
         \ . get(g:id_map.slack_workspace, a:workspace_token)
         \ . '/channel.slimc'
+    " debug echo l:write_lines
     call writefile(l:write_lines, l:file_path)
 endfunction
 

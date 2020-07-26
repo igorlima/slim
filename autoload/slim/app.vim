@@ -43,6 +43,8 @@ function! s:openChannelList(workspace)
         \ .'/workspaces/'
         \ . a:workspace
         \ .'/channel.slimc')
+    " XXX
+    echo 'openChannelList'
     nnoremap <buffer> <CR> 0wvt[h"zy:call slim#app#changeChannel(@z)<CR>
 endfunction
 
@@ -83,7 +85,7 @@ function! slim#app#sendMessage(text, channel)
         \ 'uri': l:uri,
         \ 'params': {
         \   "token": get(g:id_map.slim_workspace,g:current_workspace),
-        \   'text': a:text,
+        \   "text": "" . a:text,
         \   'channel': l:channel
         \   }
         \ }
@@ -93,10 +95,14 @@ function! slim#app#sendMessage(text, channel)
 endfunction
 
 function! slim#app#changeChannel(channel)
+    " XXX
+    echo 'changeChannel 1'
     if g:current_workspace_channel ==# a:channel
         return
     endif
 
+    " XXX
+    echo 'changeChannel 2'
     call slim#util#updateConfig('',{'g:current_workspace_channel': a:channel})
     tabclose
     call slim#StartSlack()
@@ -126,6 +132,61 @@ function! s:loadWorkspaceMappings()
             exe 'nnoremap '.l:mapping.' :call slim#app#changeWorkspace("'.l:workspace_name.'")'.'<CR>'
         endif
     endfor
+endfunction
+
+" XXX a new function to check out for unread channel
+" • command! SlackUnreadChannel :call slim#app#checkForUnreadChannel()
+function! slim#app#checkForUnreadChannel()
+    echom "FETCHING unread messages..."
+    let l:url = 'https://slack.com/api/client.counts'
+
+    let g:id_map['slim_count'] = {}
+
+    let l:request = {
+        \ 'method': 'POST',
+        \ 'uri': l:url,
+        \ 'params': {
+        \   "token": get(g:id_map.slim_workspace,g:current_workspace),
+        \   }
+        \ }
+    let l:curl = slim#util#getCurlCommand(l:request)
+    let l:response = system(l:curl)
+    let l:decoded = json_decode(l:response)
+    let l:lines = []
+    let l:channels = l:decoded['channels']
+    for l:channel in l:channels
+      let l:channel_id = channel['id']
+      let g:id_map['slim_count'][l:channel_id] = l:channel
+    endfor
+
+    let l:workspace_dir = g:data_path . '/workspaces/' .g:current_workspace
+    let l:channel_file_name = l:workspace_dir. '/channel.slimc'
+    if !filereadable(l:channel_file_name)
+        call writefile([], l:channel_file_name)
+    endif
+    let l:channel_list = readfile(l:channel_file_name)
+
+    let l:n = len(l:channel_list)
+    let l:i = 0
+    while l:i < l:n
+      let l:line = l:channel_list[i]
+      let l:key = matchstr(l:line, '\[=\zs.*\ze=\]')
+      let l:name = matchstr(l:line, '[\#\|🔒\|\@]\s\zs.*\ze\s\[=')
+      let l:str = matchstr(l:line, '\zs.*=\]\ze')
+
+      if !empty(l:key) && !empty(l:name) && has_key(g:id_map['slim_count'], l:key)
+        if g:id_map['slim_count'][l:key]['has_unreads']
+          let l:channel_list[i] = '' . l:str . ' unread'
+        else
+          let l:channel_list[i] = '' . l:str
+        endif
+      endif
+
+      let l:i += 1
+    endwhile
+
+    call writefile(l:channel_list, l:channel_file_name)
+    echom "FETCHED unread messages..."
 endfunction
 
 function! slim#app#requestChannelHistory(channel_name)
