@@ -313,8 +313,19 @@ function! slim#app#requestChannelHistory(channel_name)
     let l:lines = []
     let l:messages = reverse(l:decoded['messages'])
     for l:message in l:messages
-        let l:user_name = get(g:id_map.slack_member, l:message.user, 'Member')
-        let l:user_id = l:message.user
+        let l:user_name = ''
+        let l:user_id = ''
+        if has_key(l:message, 'user')
+          let l:user_name = get(g:id_map.slack_member, l:message.user, 'Member')
+          let l:user_id = l:message.user
+        elseif has_key(l:message, 'username')
+          let l:user_name = get(g:id_map.slack_member, l:message.username, 'Member')
+          let l:user_id = l:message.username
+        else
+          let l:user_name = 'XXX'
+          let l:user_id = 'YYY'
+        endif
+
         let l:text = map(split(l:message.text, '\n'), '"  ".v:val')
 
         " let l:text = ' ' .substitute(l:message.text, '\^@', '\n', 'g')
