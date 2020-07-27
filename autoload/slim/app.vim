@@ -238,14 +238,19 @@ function! slim#app#checkForUnreadMessages()
         if has_key(l:message, 'user')
           let l:user_id = l:message.user
         elseif has_key(l:message, 'username')
+          " prob a named bot
           let l:user_id = l:message.username
+        elseif has_key(l:message, 'bot_id')
+          let l:user_id = l:message.bot_id
         else
           let l:user_id = 'NONE'
         endif
 
+        let l:user_name = get(g:id_map.slack_member, l:user_id, l:user_id)
+
         let l:text = map(split(l:message.text, '\n'), '"  ".v:val')
         let l:time = strftime("d-%Ya%mm%dd %I:%M %p", l:message.ts)
-        call add(l:messages_lines, l:user_id . ' ' . l:time)
+        call add(l:messages_lines, l:user_name . ' ' . l:time)
         call add(l:messages_lines, '-------')
         call extend(l:messages_lines, l:text)
         call add(l:messages_lines, '')
