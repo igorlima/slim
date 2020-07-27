@@ -45,7 +45,7 @@ function! s:openChannelList(workspace)
         \ .'/channel.slimc')
     " XXX
     " echo 'openChannelList'
-    nnoremap <buffer> slm 0wvt[h"zy:call slim#app#markChannelAsRead(@z)<CR>
+    nnoremap <buffer> slm 0wvt[h"zy:call slim#app#markChannelAsRead({'name': @z, 'id': ''})<CR>
     nnoremap <buffer> slu :call slim#app#checkForUnreadChannel()<CR>
     nnoremap <buffer> <CR> 0wvt[h"zy:call slim#app#changeChannel(@z)<CR>
 endfunction
@@ -227,7 +227,7 @@ function! slim#app#checkForUnreadMessages()
       let l:channel_name = get(g:id_map.slack_channel, l:channel.channel_id, 'Channel')
       let l:messages_lines = []
 
-      call add(l:lines, l:channel_name)
+      call add(l:lines, l:channel_name . ' [=' . l:channel.channel_id . '=]')
       call add(l:lines, '=======')
       call add(l:lines, '')
 
@@ -256,14 +256,16 @@ function! slim#app#checkForUnreadMessages()
 
     call writefile(l:lines, l:channel_file_name)
     execute 'e ' . l:channel_file_name
+    nnoremap <buffer> slm 0f=lvt="zy:call slim#app#markChannelAsRead({'name': '', 'id': @z})<CR>
+    nnoremap <buffer> slu :call slim#app#checkForUnreadMessages()<CR>
     " echom "FETCHED unread messages..."
 endfunction
 
 function! slim#app#markChannelAsRead(channel)
     " XXX
-    let l:channel_id = ''
-    if has_key(g:id_map['slim_channel'], a:channel)
-      let l:channel_id = g:id_map['slim_channel'][a:channel]
+    let l:channel_id = a:channel.id
+    if has_key(g:id_map['slim_channel'], a:channel.name)
+      let l:channel_id = g:id_map['slim_channel'][a:channel.name]
     endif
     if empty(l:channel_id)
       return
@@ -291,7 +293,7 @@ function! slim#app#markChannelAsRead(channel)
     let l:curl = slim#util#getCurlCommand(l:request)
     let l:response = system(l:curl)
     let l:decoded = json_decode(l:response)
-    echom 'marked as read: ' . a:channel
+    echom 'marked as read the channel: ' . a:channel.name . '' . a:channel.id
     " echom "l:decoded"
 endfunction
 
