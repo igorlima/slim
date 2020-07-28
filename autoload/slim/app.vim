@@ -226,14 +226,22 @@ function! slim#app#checkForUnreadMessages()
       let l:unreads = l:channel['total_unreads']
       let l:channel_name = get(g:id_map.slack_channel, l:channel.channel_id, 'Channel')
       let l:messages_lines = []
+      let l:msg_count = len(l:channel.messages)
 
-      call add(l:lines, l:channel_name . ' [=' . l:channel.channel_id . '=]')
+      call add(l:lines, l:channel_name . ' (' . l:msg_count . ') [=' . l:channel.channel_id . '=]')
       call add(l:lines, '=======')
       call add(l:lines, '')
 
-      let l:messages = l:channel['messages']
+      let l:messages = reverse(l:channel['messages'])
       for l:message in l:messages
         let l:user_id = ''
+        let l:thread = ' '
+
+        if has_key(l:message, 'reply_count')
+          let l:thread = ' (' . l:message.reply_count . ')'
+          let l:thread = l:thread . ' [='. l:channel.channel_id .'=]'
+          let l:thread = l:thread . ' [='. l:message.thread_ts .'=]'
+        endif
 
         if has_key(l:message, 'user')
           let l:user_id = l:message.user
@@ -250,7 +258,7 @@ function! slim#app#checkForUnreadMessages()
 
         let l:text = map(split(l:message.text, '\n'), '"  ".v:val')
         let l:time = strftime("d-%Ya%mm%dd %I:%M %p", l:message.ts)
-        call add(l:messages_lines, l:user_name . ' ' . l:time)
+        call add(l:messages_lines, l:user_name . ' ' . l:time . l:thread)
         call add(l:messages_lines, '-------')
         call extend(l:messages_lines, l:text)
         call add(l:messages_lines, '')
