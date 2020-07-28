@@ -61,6 +61,7 @@ function! s:openChannel(workspace, channel)
     " call TailStart()
     " command! -nargs=0 TailStart call tail#start_tail()
     nnoremap <buffer> slu :call slim#app#checkForUnreadMessages()<CR>
+    nnoremap <buffer> slT :call slim#app#seeThreadMessages()<CR>
 endfunction
 
 function! s:openWorkspaceList()
@@ -221,6 +222,9 @@ function! slim#app#checkForUnreadMessages()
     endif
 
     let l:lines = []
+    call add(l:lines, 'UNREAD HISTORY')
+    call add(l:lines, '')
+
     for l:channel in l:channels
       let l:count = l:channel['messages_count']
       let l:unreads = l:channel['total_unreads']
@@ -272,6 +276,7 @@ function! slim#app#checkForUnreadMessages()
     nnoremap <buffer> slm 0f=lvt="zy:call slim#app#markChannelAsRead({'name': '', 'id': @z})<CR>
     nnoremap <buffer> slu :call slim#app#checkForUnreadMessages()<CR>
     nnoremap <buffer> slt 0v$"zy:call slim#app#seeThreadMessage(@z)<CR>
+    nnoremap <buffer> slT :call slim#app#seeThreadMessages()<CR>
     " echom "FETCHED unread messages..."
 endfunction
 
@@ -301,37 +306,85 @@ function! slim#app#seeThreadMessage(msg_line)
   let l:messages = l:decoded['messages']
 
   let l:messages_lines = []
+  call add(l:messages_lines, 'THREAD')
+  call add(l:messages_lines, '')
+
   for l:message in l:messages
-    let l:user_id = ''
-
-    if has_key(l:message, 'user')
-      let l:user_id = l:message.user
-    elseif has_key(l:message, 'username')
-      " prob a named bot
-      let l:user_id = l:message.username
-    elseif has_key(l:message, 'bot_id')
-      let l:user_id = l:message.bot_id
-    else
-      let l:user_id = 'NONE'
-    endif
-
-    let l:user_name = get(g:id_map.slack_member, l:user_id, l:user_id)
-
-    let l:text = map(split(l:message.text, '\n'), '"  ".v:val')
-    let l:time = strftime("d-%Ya%mm%dd %I:%M %p", l:message.ts)
-    call add(l:messages_lines, l:user_name . ' ' . l:time)
-    call add(l:messages_lines, '-------')
-    call extend(l:messages_lines, l:text)
-    call add(l:messages_lines, '')
+    call extend(l:messages_lines, slim#app#mountMessage(l:message))
   endfor
 
   let l:workspace_dir = g:data_path . '/workspaces/' . g:current_workspace
-  let l:channel_file_name = l:workspace_dir . '/all_unreads.slimv'
   let l:thread_file_name = l:workspace_dir . '/thread.slimv'
   if !filereadable(l:thread_file_name)
       call writefile([], l:thread_file_name)
   endif
   call writefile(l:messages_lines, l:thread_file_name)
+  execute 'e ' . l:thread_file_name
+  nnoremap <buffer> <BS> :call slim#app#checkForUnreadMessages()<CR>
+endfunction
+
+function slim#app#mountMessage(message)
+  let l:messages_lines = []
+  let l:user_id = ''
+
+  if has_key(a:message, 'user')
+    let l:user_id = a:message.user
+  elseif has_key(a:message, 'username')
+    " prob a named bot
+    let l:user_id = a:message.username
+  elseif has_key(a:message, 'bot_id')
+    let l:user_id = a:message.bot_id
+  else
+    let l:user_id = 'NONE'
+  endif
+
+  let l:user_name = get(g:id_map.slack_member, l:user_id, l:user_id)
+
+  let l:text = map(split(a:message.text, '\n'), '"  ".v:val')
+  let l:time = strftime("d-%Ya%mm%dd %I:%M %p", a:message.ts)
+  call add(l:messages_lines, l:user_name . ' ' . l:time)
+  call add(l:messages_lines, '-------')
+  call extend(l:messages_lines, l:text)
+  call add(l:messages_lines, '')
+  return l:messages_lines
+endfunction
+
+function! slim#app#seeThreadMessages()
+  let l:url = 'https://slack.com/api/subscriptions.thread.getView'
+  let l:request = {
+      \ 'method': 'POST',
+      \ 'uri': l:url,
+      \ 'params': {
+      \   "token": get(g:id_map.slim_workspace,g:current_workspace),
+      \   "limit": 10,
+      \   }
+      \ }
+  let l:curl = slim#util#getCurlCommand(l:request)
+  let l:response = system(l:curl)
+  let l:decoded = json_decode(l:response)
+  let l:threads = l:decoded['threads']
+
+  let l:thread_lines = []
+  call add(l:thread_lines, 'THREADS')
+  call add(l:thread_lines, '')
+  for l:thread in l:threads
+    let l:channel_name = get(g:id_map.slack_channel, l:thread.root_msg.channel, 'Channel')
+    call add(l:thread_lines, l:channel_name . ' [=' . l:thread.root_msg.channel . '=]')
+    call add(l:thread_lines, '=======')
+    call add(l:thread_lines, '')
+
+    call extend(l:thread_lines, slim#app#mountMessage(l:thread.root_msg))
+    for l:reply in l:thread.latest_replies
+      call extend(l:thread_lines, slim#app#mountMessage(l:reply))
+    endfor
+  endfor
+
+  let l:workspace_dir = g:data_path . '/workspaces/' . g:current_workspace
+  let l:thread_file_name = l:workspace_dir . '/thread.slimv'
+  if !filereadable(l:thread_file_name)
+      call writefile([], l:thread_file_name)
+  endif
+  call writefile(l:thread_lines, l:thread_file_name)
   execute 'e ' . l:thread_file_name
   nnoremap <buffer> <BS> :call slim#app#checkForUnreadMessages()<CR>
 endfunction
