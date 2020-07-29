@@ -194,6 +194,58 @@ function! slim#app#checkForUnreadChannel()
     " echom "FETCHED unread channels..."
 endfunction
 
+function! slim#app#channelListIAmIn()
+    " echom "FETCHING my channels..."
+    let l:url = 'https://slack.com/api/client.counts'
+    let l:request = {
+        \ 'method': 'POST',
+        \ 'uri': l:url,
+        \ 'params': {
+        \   "token": get(g:id_map.slim_workspace,g:current_workspace),
+        \   }
+        \ }
+    let l:curl = slim#util#getCurlCommand(l:request)
+    let l:response = system(l:curl)
+    let l:decoded = json_decode(l:response)
+    let l:channels = l:decoded['channels']
+
+    let l:n = len(l:channels)
+    let l:i = 1
+    let l:lines = []
+    for l:channel in l:channels
+      let l:id = l:channel.id
+      let l:url = 'https://slack.com/api/conversations.info'
+      let l:request = {
+          \ 'method': 'POST',
+          \ 'uri': l:url,
+          \ 'params': {
+          \   "token": get(g:id_map.slim_workspace,g:current_workspace),
+          \   "channel": l:id,
+          \   }
+          \ }
+      let l:curl = slim#util#getCurlCommand(l:request)
+      let l:response = system(l:curl)
+      let l:decoded = json_decode(l:response)
+      let l:info = l:decoded.channel
+
+      let l:line = ''
+      if l:info.is_private
+        let l:line = l:line . '🔒 '
+      else
+        let l:line = l:line . '# '
+      endif
+
+      let l:line = l:line . l:info.name . ' [=' . l:id . '=]'
+      call add(l:lines, l:line)
+      echo '' . l:i . ':' . l:n
+      let l:i += 1
+    endfor
+
+    execute 'tabnew'
+    call append(line('$'), l:lines)
+    return
+endfunction
+
 " XXX a new function to check out for all unread messages
 " • command! SlackUnreadMessages :call slim#app#checkForUnreadMessages()
 function! slim#app#checkForUnreadMessages()
