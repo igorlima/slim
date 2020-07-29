@@ -62,6 +62,7 @@ function! s:openChannel(workspace, channel)
     " command! -nargs=0 TailStart call tail#start_tail()
     nnoremap <buffer> slu :call slim#app#checkForUnreadMessages()<CR>
     nnoremap <buffer> slT :call slim#app#seeThreadMessages()<CR>
+    nnoremap <buffer> slt 0v$"zy:call slim#app#seeThreadMessage(@z)<CR>
 endfunction
 
 function! s:openWorkspaceList()
@@ -526,6 +527,14 @@ function! slim#app#requestChannelHistory(channel_name)
         let l:time = strftime("d-%Ya%mm%dd %I:%M %p", l:message.ts)
 
         call add(l:lines, l:user_name . ' ' . l:time . ' [='.l:user_id.'=]')
+        let l:thread = ' '
+        if has_key(l:message, 'reply_count')
+          let l:thread = ' (' . l:message.reply_count . ')'
+          let l:thread = l:thread . ' [='. l:channel_id .'=]'
+          let l:thread = l:thread . ' [='. l:message.thread_ts .'=]'
+          call add(l:lines, l:thread)
+        endif
+
         call add(l:lines, '-------')
         call extend(l:lines, l:text)
         call add(l:lines, '')
