@@ -480,13 +480,24 @@ endfunction
 function! slim#app#requestChannelHistory(channel_name)
     " echom "REQUESTING HISTORY"
     let l:url = 'https://slack.com/api/conversations.history'
+    let l:channel_id = get(g:id_map.slim_channel,a:channel_name)
+    let l:oldest = 0
+
+    if has_key(g:id_map, 'slim_count')
+      let l:channel = g:id_map['slim_count'][l:channel_id]
+      if l:channel.latest > l:channel.last_read
+        let l:oldest = l:channel.last_read
+      endif
+    endif
 
     let l:request = {
         \ 'method': 'GET',
         \ 'uri': l:url,
         \ 'params': {
         \   "token": get(g:id_map.slim_workspace,g:current_workspace),
-        \   "channel": get(g:id_map.slim_channel,a:channel_name)
+        \   "channel": l:channel_id,
+        \   "limit": 100,
+        \   "oldest": l:oldest,
         \   }
         \ }
     let l:curl = slim#util#getCurlCommand(l:request)
@@ -497,6 +508,7 @@ function! slim#app#requestChannelHistory(channel_name)
     for l:message in l:messages
         let l:user_name = ''
         let l:user_id = ''
+
         if has_key(l:message, 'user')
           let l:user_name = get(g:id_map.slack_member, l:message.user, 'Member')
           let l:user_id = l:message.user
